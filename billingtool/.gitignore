@@ -1,10 +1,7 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 /node_modules
 /.pnp
 .pnp.js
-.yarn/install-state.gz
 
 # testing
 /coverage
@@ -27,6 +24,10 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env
+.env.development
+.env.test
+.env.production
 
 # vercel
 .vercel
@@ -35,9 +36,39 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# uploads - exclude uploaded files but keep directory structure
+# IDE
+.vscode
+.idea
+
+# Uploaded files
 /public/uploads/*
-!/public/uploads/.gitkeep
+!/public/uploads/
 !/public/uploads/business-logos/
 /public/uploads/business-logos/*
 !/public/uploads/business-logos/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+
+# Test data
+/test/data
+/test/fixtures
+
+# Logs
+*.log
+logs/
+
+# Email templates test data
+/src/lib/email-templates/__tests__/
+/src/lib/email-templates/__mocks__/
+/src/lib/email-templates/*.test.ts
+/src/lib/email-templates/*.spec.ts
+/src/lib/email-templates/test-*.ts
+/src/lib/email-templates/mock-*.ts
+/src/lib/email-templates/sample-*.ts
+*.test.email.ts
+*.test.email.html
+*.sample.email.ts
+*.sample.email.html

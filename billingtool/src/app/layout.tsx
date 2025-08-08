@@ -18,11 +18,7 @@ export const metadata: Metadata = {
   },
   description: 'Streamline your business operations with our comprehensive billing and invoicing solution. Manage businesses, products, and sales with ease.',
   icons: {
-    icon: [
-      { url: '/images/logo-main.png', sizes: 'any' },
-      { url: '/images/logo-main.png', sizes: '32x32', type: 'image/png' },
-    ],
-    apple: '/images/logo-main.png',
+    icon: [{ url: '/api/favicon' }],
   },
   openGraph: {
     title: 'Dev & Debate Billing Tool - Business Management & Invoicing',
@@ -51,12 +47,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="icon" href="/images/logo-main.png" sizes="any" />
-        <link rel="icon" href="/images/logo-main.png" type="image/png" />
-        <link rel="shortcut icon" href="/images/logo-main.png" />
-        <link rel="apple-touch-icon" href="/images/logo-main.png" />
-      </head>
+      <head />
       <body 
         className={`min-h-screen bg-black text-white antialiased ${dmSans.variable}`}
         suppressHydrationWarning={true}
