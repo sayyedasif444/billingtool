@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+  --primary-rgb: 59, 130, 246; /* Blue color in RGB format */
+  --primary: #3b82f6; /* Blue color */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(17, 17, 17);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(38, 38, 38);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(64, 64, 64);
+}
+
+/* Additional utility classes */
+.bg-primary {
+  background-color: rgb(var(--primary-rgb));
+}
+
+.text-primary {
+  color: var(--primary);
+}
+
+.border-primary {
+  border-color: var(--primary);
+}
+
+.from-primary {
+  --tw-gradient-from: var(--primary);
+}
+
+.to-primary {
+  --tw-gradient-to: var(--primary);
+}
+
+.via-primary {
+  --tw-gradient-stops: var(--tw-gradient-from), var(--primary), var(--tw-gradient-to);
+}
+
+/* For animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Base styles for sections */
+section {
+  @apply bg-black relative z-10;
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
