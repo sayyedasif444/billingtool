@@ -23,11 +23,18 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard');
+    }
+  }, [user, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,8 +73,8 @@ export default function SignupPage() {
       // Sign in the user
       signIn(user);
       
-      // Redirect to home page
-      router.push('/');
+      // Redirect to dashboard
+      router.push('/dashboard');
     } catch (error: unknown) {
       console.error('Signup error:', error);
       setError(error instanceof Error ? error.message : 'An error occurred during signup');
@@ -76,7 +83,7 @@ export default function SignupPage() {
     }
   };
 
-  if (!isClient) {
+  if (!isClient || authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black relative">
         <BackgroundPattern />
