@@ -3,16 +3,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { getUserInvoices, getBusiness } from '@/lib/firebase';
+import { getUserInvoices, getBusiness, deleteInvoice, getUserBusinesses } from '@/lib/firebase';
 import type { Invoice, Business } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import BackgroundPattern from '@/components/ui/BackgroundPattern';
-import { Receipt, Search, Filter, Eye, Building2, Calendar, DollarSign } from 'lucide-react';
+import DeleteConfirmationDialog from '@/components/ui/DeleteConfirmationDialog';
+import CreateInvoiceForm from '@/components/invoices/CreateInvoiceForm';
+import { Receipt, Search, Eye, Building2, Calendar, DollarSign, Trash2, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 export default function InvoicesPage() {
   const { user, loading: authLoading } = useAuth();
@@ -23,6 +25,12 @@ export default function InvoicesPage() {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; invoice: Invoice | null }>({
+    isOpen: false,
+    invoice: null
+  });
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [userBusinesses, setUserBusinesses] = useState<Business[]>([]);
 
   const loadInvoices = useCallback(async () => {
     try {
@@ -30,6 +38,10 @@ export default function InvoicesPage() {
       if (!user) {
         throw new Error('User not authenticated');
       }
+
+      // Load user's businesses first
+      const businesses = await getUserBusinesses(user.email);
+      setUserBusinesses(businesses);
 
       const userInvoices = await getUserInvoices(user.email);
       setInvoices(userInvoices);
@@ -74,6 +86,31 @@ export default function InvoicesPage() {
 
   const handleStatusFilter = (status: string) => {
     setStatusFilter(status);
+  };
+
+  const handleDeleteInvoice = (invoice: Invoice, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteDialog({ isOpen: true, invoice });
+  };
+
+  const confirmDeleteInvoice = async () => {
+    if (!deleteDialog.invoice?.id) return;
+    
+    try {
+      await deleteInvoice(deleteDialog.invoice.id);
+      setInvoices(prev => prev.filter(i => i.id !== deleteDialog.invoice?.id));
+      setDeleteDialog({ isOpen: false, invoice: null });
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      setError('Failed to delete invoice');
+    }
+  };
+
+  const handleInvoiceCreated = (newInvoice: Invoice) => {
+    setInvoices(prev => [newInvoice, ...prev]);
+    setShowCreateForm(false);
+    // Reload invoices to get the latest data
+    loadInvoices();
   };
 
   const filteredInvoices = invoices.filter(invoice => {
@@ -144,8 +181,74 @@ export default function InvoicesPage() {
               <h1 className="text-3xl font-bold text-white mb-2">All Invoices</h1>
               <p className="text-gray-300">View and manage all your invoices</p>
             </div>
+            <Button
+              onClick={() => setShowCreateForm(true)}
+              className="bg-gradient-to-r from-primary to-blue-700"
+              disabled={userBusinesses.length === 0}
+              title={userBusinesses.length === 0 ? 'You need to create a business first' : 'Create a new invoice'}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Invoice
+            </Button>
           </div>
         </motion.div>
+
+        {/* No Businesses Warning */}
+        {userBusinesses.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-blue-900/50 border border-blue-500 rounded-lg text-blue-200"
+          >
+            <div className="flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              <span>
+                You need to create a business first before you can create invoices. 
+                <Button
+                  variant="link"
+                  className="text-blue-300 hover:text-blue-200 p-0 h-auto ml-2"
+                  onClick={() => router.push('/businesses')}
+                >
+                  Go to Businesses
+                </Button>
+              </span>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Create Invoice Form */}
+        {showCreateForm && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            {userBusinesses.length > 0 ? (
+              <CreateInvoiceForm
+                businessId={userBusinesses[0]?.id || ''}
+                onSuccess={handleInvoiceCreated}
+                onCancel={() => setShowCreateForm(false)}
+              />
+            ) : (
+              <div className="text-center py-8">
+                <div className="mx-auto w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                  <Building2 className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">No Businesses Available</h3>
+                <p className="text-gray-400 mb-4">
+                  You need to create a business first before you can create invoices.
+                </p>
+                <Button
+                  onClick={() => router.push('/businesses')}
+                  className="bg-gradient-to-r from-primary to-blue-700"
+                >
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Create Business
+                </Button>
+              </div>
+            )}
+          </motion.div>
+        )}
 
         {/* Search and Filters */}
         <motion.div
@@ -266,7 +369,7 @@ export default function InvoicesPage() {
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="w-4 h-4" />
-                              <span>{invoice.createdAt.toLocaleDateString()}</span>
+                              <span>{formatDate(invoice.invoiceDate)}</span>
                             </div>
                           </div>
                           
@@ -298,6 +401,15 @@ export default function InvoicesPage() {
                               <Eye className="w-4 h-4 mr-1" />
                               View
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => handleDeleteInvoice(invoice, e)}
+                              className="border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                              title="Delete invoice"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -308,6 +420,16 @@ export default function InvoicesPage() {
             </div>
           )}
         </motion.div>
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          isOpen={deleteDialog.isOpen}
+          onClose={() => setDeleteDialog({ isOpen: false, invoice: null })}
+          onConfirm={confirmDeleteInvoice}
+          title="Delete Invoice"
+          description="Are you sure you want to delete this invoice? This action cannot be undone."
+          itemName={`Invoice #${deleteDialog.invoice?.invoiceNumber || ''}`}
+        />
       </div>
     </div>
   );

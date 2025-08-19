@@ -1,5 +1,5 @@
 import { Invoice, Business } from './firebase';
-import { formatCurrency } from './utils';
+import { formatCurrency, formatDate } from './utils';
 
 export interface EmailTemplateData {
   invoice: Invoice;
@@ -65,8 +65,8 @@ export function generateInvoiceEmailHTML(data: EmailTemplateData): string {
           <div style="flex: 1; text-align: right; width: 50%;">
             <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #111827;">Invoice Details:</h3>
             <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;"><strong>Invoice #:</strong> ${invoice.invoiceNumber}</p>
-            <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;"><strong>Date:</strong> ${invoice.createdAt.toLocaleDateString()}</p>
-            ${invoice.dueDate ? `<p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>Due Date:</strong> ${invoice.dueDate.toLocaleDateString()}</p>` : ''}
+            <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;"><strong>Date:</strong> ${formatDate(invoice.createdAt)}</p>
+            ${invoice.dueDate ? `<p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>Due Date:</strong> ${formatDate(invoice.dueDate)}</p>` : ''}
           </div>
         </div>
 
@@ -75,10 +75,10 @@ export function generateInvoiceEmailHTML(data: EmailTemplateData): string {
           <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db;">
             <thead>
               <tr style="background-color: #f9fafb;">
-                <th style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: left; font-weight: 600; color: #111827; font-size: 14px;">Item</th>
-                <th style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: left; font-weight: 600; color: #111827; font-size: 14px;">Description</th>
-                <th style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">Quantity</th>
-                <th style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">Unit Price</th>
+                <th style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: left; font-weight: 600; color: #111827; font-size: 14px;">${invoice.preferences?.columnHeaders?.item || 'Item'}</th>
+                <th style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: left; font-weight: 600; color: #111827; font-size: 14px;">${invoice.preferences?.columnHeaders?.description || 'Description'}</th>
+                <th style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">${invoice.preferences?.columnHeaders?.quantity || 'Quantity'}</th>
+                <th style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">${invoice.preferences?.columnHeaders?.price || 'Unit Price'}</th>
                 <th style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">Total</th>
               </tr>
             </thead>
@@ -166,8 +166,8 @@ ${invoice.customerAddress.country}
 
 Invoice Details:
 Invoice #: ${invoice.invoiceNumber}
-Date: ${invoice.createdAt.toLocaleDateString()}
-${invoice.dueDate ? `Due Date: ${invoice.dueDate.toLocaleDateString()}` : ''}
+Date: ${formatDate(invoice.createdAt)}
+${invoice.dueDate ? `Due Date: ${formatDate(invoice.dueDate)}` : ''}
 
 Items:
 ${itemsText}

@@ -27,7 +27,7 @@ import {
   Receipt,
 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { formatCurrency, getLogoUrl } from '@/lib/utils';
+import { formatCurrency, getLogoUrl, formatDate } from '@/lib/utils';
 import Image from 'next/image';
 import { generateInvoiceEmailHTML, generateInvoiceEmailText } from '@/lib/email-templates';
 
@@ -235,7 +235,7 @@ export default function InvoiceViewPage() {
               }</p>
               <p style="margin: 2px 0;"><strong>Date:</strong> ${
                 invoice?.createdAt
-                  ? new Date(invoice.createdAt).toLocaleDateString()
+                  ? formatDate(invoice.invoiceDate)
                   : ''
               }</p>
             </div>
@@ -244,10 +244,10 @@ export default function InvoiceViewPage() {
           <table class="items-table">
             <thead>
               <tr>
-                <th>Item</th>
-                <th>Description</th>
-                <th>Quantity</th>
-                <th>Unit Price</th>
+                <th>${invoice?.preferences?.columnHeaders?.item || 'Item'}</th>
+                <th>${invoice?.preferences?.columnHeaders?.description || 'Description'}</th>
+                <th>${invoice?.preferences?.columnHeaders?.quantity || 'Quantity'}</th>
+                <th>${invoice?.preferences?.columnHeaders?.price || 'Unit Price'}</th>
                 <th>Total</th>
               </tr>
             </thead>
@@ -421,8 +421,8 @@ export default function InvoiceViewPage() {
             <div style="flex: 1; text-align: right;">
               <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold;">Invoice Details:</h3>
               <p style="margin: 0 0 4px 0; font-size: 14px;"><strong>Invoice #:</strong> ${invoice.invoiceNumber}</p>
-              <p style="margin: 0 0 4px 0; font-size: 14px;"><strong>Date:</strong> ${invoice.createdAt.toLocaleDateString()}</p>
-              ${invoice.dueDate ? `<p style="margin: 0; font-size: 14px;"><strong>Due Date:</strong> ${invoice.dueDate.toLocaleDateString()}</p>` : ''}
+              <p style="margin: 0 0 4px 0; font-size: 14px;"><strong>Date:</strong> ${formatDate(invoice.invoiceDate)}</p>
+              ${invoice.dueDate ? `<p style="margin: 0; font-size: 14px;"><strong>Due Date:</strong> ${formatDate(invoice.dueDate)}</p>` : ''}
             </div>
           </div>
 
@@ -431,10 +431,10 @@ export default function InvoiceViewPage() {
             <table style="width: 100%; border-collapse: collapse; border: 1px solid black;">
               <thead>
                 <tr style="background-color: #f5f5f5;">
-                  <th style="border: 1px solid black; padding: 8px; text-align: left; font-weight: bold;">Item</th>
-                  <th style="border: 1px solid black; padding: 8px; text-align: left; font-weight: bold;">Description</th>
-                  <th style="border: 1px solid black; padding: 8px; text-align: right; font-weight: bold;">Quantity</th>
-                  <th style="border: 1px solid black; padding: 8px; text-align: right; font-weight: bold;">Unit Price</th>
+                  <th style="border: 1px solid black; padding: 8px; text-align: left; font-weight: bold;">${invoice?.preferences?.columnHeaders?.item || 'Item'}</th>
+                  <th style="border: 1px solid black; padding: 8px; text-align: left; font-weight: bold;">${invoice?.preferences?.columnHeaders?.description || 'Description'}</th>
+                  <th style="border: 1px solid black; padding: 8px; text-align: right; font-weight: bold;">${invoice?.preferences?.columnHeaders?.quantity || 'Quantity'}</th>
+                  <th style="border: 1px solid black; padding: 8px; text-align: right; font-weight: bold;">${invoice?.preferences?.columnHeaders?.price || 'Unit Price'}</th>
                   <th style="border: 1px solid black; padding: 8px; text-align: right; font-weight: bold;">Total</th>
                 </tr>
               </thead>
@@ -847,7 +847,7 @@ export default function InvoiceViewPage() {
                     Invoice Details
                   </CardTitle>
                   <CardDescription className='text-gray-300'>
-                Generated on {invoice.createdAt.toLocaleDateString()}
+                                  Generated on {formatDate(invoice.invoiceDate)}
               </CardDescription>
                 </div>
                 {business?.logo && (
@@ -927,13 +927,13 @@ export default function InvoiceViewPage() {
                       </span>
                     </p>
                     <p>
-                      <strong>Created:</strong>{' '}
-                      {invoice.createdAt.toLocaleDateString()}
+                      <strong>Invoice Date:</strong>{' '}
+                      {formatDate(invoice.invoiceDate)}
                     </p>
                     {invoice.dueDate && (
                       <p>
                         <strong>Due Date:</strong>{' '}
-                        {invoice.dueDate.toLocaleDateString()}
+                        {formatDate(invoice.dueDate)}
                       </p>
                     )}
                   </div>
@@ -948,16 +948,16 @@ export default function InvoiceViewPage() {
                     <thead className='bg-black/50'>
                       <tr>
                         <th className='px-4 py-3 text-left text-white font-semibold'>
-                          Item
+                          {invoice.preferences?.columnHeaders?.item || 'Item'}
                         </th>
                         <th className='px-4 py-3 text-left text-white font-semibold'>
-                          Description
+                          {invoice.preferences?.columnHeaders?.description || 'Description'}
                         </th>
                         <th className='px-4 py-3 text-right text-white font-semibold'>
-                          Quantity
+                          {invoice.preferences?.columnHeaders?.quantity || 'Quantity'}
                         </th>
                         <th className='px-4 py-3 text-right text-white font-semibold'>
-                          Unit Price
+                          {invoice.preferences?.columnHeaders?.price || 'Unit Price'}
                         </th>
                         <th className='px-4 py-3 text-right text-white font-semibold'>
                           Total
@@ -1218,12 +1218,12 @@ export default function InvoiceViewPage() {
                 </p>
                 <p style={{ margin: '0 0 4px 0', fontSize: '14px' }}>
                   <strong>Date:</strong>{' '}
-                  {invoice.createdAt.toLocaleDateString()}
+                  {formatDate(invoice.invoiceDate)}
                 </p>
                 {invoice.dueDate && (
                   <p style={{ margin: '0', fontSize: '14px' }}>
                     <strong>Due Date:</strong>{' '}
-                    {invoice.dueDate.toLocaleDateString()}
+                    {formatDate(invoice.dueDate)}
                   </p>
                 )}
               </div>

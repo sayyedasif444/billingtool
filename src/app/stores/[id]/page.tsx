@@ -13,7 +13,7 @@ import CreateProductForm from '@/components/products/CreateProductForm';
 import CreateInvoiceForm from '@/components/invoices/CreateInvoiceForm';
 import { Package, Plus, MapPin, Phone, Mail, Building2, DollarSign, Edit, History, Receipt } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 export default function StoreDetailPage() {
   const { user } = useAuth();
@@ -207,11 +207,11 @@ export default function StoreDetailPage() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-400">Created</p>
-                    <p className="text-white">{business.createdAt.toLocaleDateString()}</p>
+                    <p className="text-white">{formatDate(business.createdAt)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">Last Updated</p>
-                    <p className="text-white">{business.updatedAt.toLocaleDateString()}</p>
+                    <p className="text-white">{formatDate(business.updatedAt)}</p>
                   </div>
                 </div>
               </div>

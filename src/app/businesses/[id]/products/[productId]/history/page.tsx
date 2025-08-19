@@ -11,7 +11,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import BackgroundPattern from '@/components/ui/BackgroundPattern';
 import { Package, ArrowLeft, History, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 
 export default function ProductPriceHistoryPage() {
   const { user, loading: authLoading } = useAuth();
@@ -165,7 +165,7 @@ export default function ProductPriceHistoryPage() {
                 {formatCurrency(product.price, business.currency)}
               </div>
               <p className="text-gray-400 mt-2">
-                Last updated: {product.updatedAt.toLocaleDateString()}
+                Last updated: {formatDate(product.updatedAt)}
               </p>
             </CardContent>
           </Card>
@@ -236,7 +236,7 @@ export default function ProductPriceHistoryPage() {
                                 {isIncrease ? 'Price Increased' : isDecrease ? 'Price Decreased' : 'Price Updated'}
                               </h3>
                               <p className="text-sm text-gray-400">
-                                {history.changedAt.toLocaleDateString()} at {history.changedAt.toLocaleTimeString()}
+                                {formatDateTime(history.changedAt)}
                               </p>
                             </div>
                           </div>

@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getUserBusinesses } from '@/lib/firebase';
+import { getUserBusinesses, deleteBusiness } from '@/lib/firebase';
 import type { Business } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import BackgroundPattern from '@/components/ui/BackgroundPattern';
 import CreateBusinessForm from '@/components/stores/CreateStoreForm';
-import { Building2, Plus, MapPin, Phone, Mail } from 'lucide-react';
+import DeleteConfirmationDialog from '@/components/ui/DeleteConfirmationDialog';
+import { Building2, Plus, MapPin, Phone, Mail, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function BusinessesPage() {
@@ -19,6 +20,10 @@ export default function BusinessesPage() {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [error, setError] = useState('');
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; business: Business | null }>({
+    isOpen: false,
+    business: null
+  });
   const router = useRouter();
 
   const loadBusinesses = useCallback(async () => {
@@ -55,6 +60,24 @@ export default function BusinessesPage() {
   const handleBusinessClick = (businessId: string) => {
     if (businessId) {
       router.push(`/businesses/${businessId}`);
+    }
+  };
+
+  const handleDeleteBusiness = (business: Business, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteDialog({ isOpen: true, business });
+  };
+
+  const confirmDeleteBusiness = async () => {
+    if (!deleteDialog.business?.id) return;
+    
+    try {
+      await deleteBusiness(deleteDialog.business.id);
+      setBusinesses(prev => prev.filter(b => b.id !== deleteDialog.business?.id));
+      setDeleteDialog({ isOpen: false, business: null });
+    } catch (error) {
+      console.error('Error deleting business:', error);
+      setError('Failed to delete business');
     }
   };
 
@@ -181,6 +204,15 @@ export default function BusinessesPage() {
                           </CardDescription>
                         </div>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => handleDeleteBusiness(business, e)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/20 p-2 h-8 w-8"
+                        title="Delete business"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -204,6 +236,16 @@ export default function BusinessesPage() {
             ))}
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          isOpen={deleteDialog.isOpen}
+          onClose={() => setDeleteDialog({ isOpen: false, business: null })}
+          onConfirm={confirmDeleteBusiness}
+          title="Delete Business"
+          description="Are you sure you want to delete this business? This will also remove all associated products and invoices."
+          itemName={deleteDialog.business?.name || ''}
+        />
       </div>
     </div>
   );

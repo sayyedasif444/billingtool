@@ -8,10 +8,10 @@ import { motion } from 'framer-motion';
 import BackgroundPattern from '@/components/ui/BackgroundPattern';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useRouter } from 'next/navigation';
-import { getUserBusinesses, getBusinessProducts } from '@/lib/firebase';
+import { getUserBusinesses, getBusinessProducts, getUserTotalIncome } from '@/lib/firebase';
 import type { Business } from '@/lib/firebase';
-import { Building2, Package, DollarSign, Receipt } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { Building2, Package, DollarSign, Receipt, TrendingUp, Calendar, Award } from 'lucide-react';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 export const Dashboard = () => {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -19,7 +19,11 @@ export const Dashboard = () => {
   const [isClient, setIsClient] = useState(false);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [totalProducts, setTotalProducts] = useState(0);
-  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [incomeStats, setIncomeStats] = useState({
+    totalIncome: 0,
+    currentMonthIncome: 0,
+    currentYearIncome: 0
+  });
   const router = useRouter();
 
   useEffect(() => {
@@ -45,8 +49,9 @@ export const Dashboard = () => {
       }
       setTotalProducts(totalProductsCount);
 
-      // TODO: Calculate total revenue from invoices
-      setTotalRevenue(0);
+      // Get income statistics
+      const incomeData = await getUserTotalIncome(user.email);
+      setIncomeStats(incomeData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -126,7 +131,7 @@ export const Dashboard = () => {
         </motion.div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -168,12 +173,29 @@ export const Dashboard = () => {
           >
             <Card className="border-white/10 bg-black/30">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-300">Total Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-medium text-gray-300">Current Month Income</CardTitle>
+                <Calendar className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white">{formatCurrency(totalRevenue, 'INR')}</div>
-                <p className="text-xs text-gray-400">Total revenue this month</p>
+                <div className="text-2xl font-bold text-white">{formatCurrency(incomeStats.currentMonthIncome, 'INR')}</div>
+                <p className="text-xs text-gray-400">From approved invoices</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="border-white/10 bg-black/30">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-300">Total Income</CardTitle>
+                <TrendingUp className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white">{formatCurrency(incomeStats.totalIncome, 'INR')}</div>
+                <p className="text-xs text-gray-400">All time from approved invoices</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -256,7 +278,7 @@ export const Dashboard = () => {
                         </div>
                       </div>
                       <div className="text-sm text-gray-400">
-                        {business.createdAt.toLocaleDateString()}
+                        {formatDate(business.createdAt)}
                       </div>
                     </div>
                   ))}

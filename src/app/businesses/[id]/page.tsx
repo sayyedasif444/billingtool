@@ -4,16 +4,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getBusiness, getBusinessProducts } from '@/lib/firebase';
+import { getBusiness, getBusinessProducts, deleteProduct, getBusinessIncome } from '@/lib/firebase';
 import type { Business, Product, Invoice } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import BackgroundPattern from '@/components/ui/BackgroundPattern';
 import CreateProductForm from '@/components/products/CreateProductForm';
 import CreateInvoiceForm from '@/components/invoices/CreateInvoiceForm';
-import { Package, Plus, MapPin, Phone, Mail, Building2, DollarSign, Edit, History, Receipt } from 'lucide-react';
+import DeleteConfirmationDialog from '@/components/ui/DeleteConfirmationDialog';
+import { Package, Plus, MapPin, Phone, Mail, Building2, Edit, History, Receipt, Trash2, TrendingUp, Award } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { formatCurrency, getLogoUrl } from '@/lib/utils';
+import { formatCurrency, getLogoUrl, formatDate } from '@/lib/utils';
 import Image from 'next/image';
 
 export default function BusinessDetailPage() {
@@ -28,13 +29,23 @@ export default function BusinessDetailPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [error, setError] = useState('');
+  const [incomeStats, setIncomeStats] = useState({
+    totalIncome: 0,
+    currentMonthIncome: 0,
+    currentYearIncome: 0
+  });
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; product: Product | null }>({
+    isOpen: false,
+    product: null
+  });
 
   const loadBusinessData = useCallback(async () => {
     try {
       setLoading(true);
-      const [businessData, productsData] = await Promise.all([
+      const [businessData, productsData, incomeData] = await Promise.all([
         getBusiness(businessId),
-        getBusinessProducts(businessId)
+        getBusinessProducts(businessId),
+        getBusinessIncome(businessId)
       ]);
 
       if (!businessData) {
@@ -44,6 +55,7 @@ export default function BusinessDetailPage() {
 
       setBusiness(businessData);
       setProducts(productsData);
+      setIncomeStats(incomeData);
     } catch (error) {
       console.error('Error loading business data:', error);
       setError('Failed to load business data');
@@ -89,6 +101,24 @@ export default function BusinessDetailPage() {
 
   const handleEditBusiness = () => {
     router.push(`/businesses/${businessId}/edit`);
+  };
+
+  const handleDeleteProduct = (product: Product, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteDialog({ isOpen: true, product });
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!deleteDialog.product?.id) return;
+    
+    try {
+      await deleteProduct(deleteDialog.product.id);
+      setProducts(prev => prev.filter(p => p.id !== deleteDialog.product?.id));
+      setDeleteDialog({ isOpen: false, product: null });
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      setError('Failed to delete product');
+    }
   };
 
   // Show loading while auth is being checked or data is loading
@@ -248,12 +278,74 @@ export default function BusinessDetailPage() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-400">Created</p>
-                    <p className="text-white">{business.createdAt.toLocaleDateString()}</p>
+                    <p className="text-white">{formatDate(business.createdAt)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">Last Updated</p>
-                    <p className="text-white">{business.updatedAt.toLocaleDateString()}</p>
+                    <p className="text-white">{formatDate(business.updatedAt)}</p>
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Income Statistics */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-8"
+        >
+          <Card className="border-white/10 bg-black/30">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                Income Statistics
+              </CardTitle>
+              <CardDescription className="text-gray-300">
+                Financial overview from approved invoices
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Disclaimer */}
+              <div className="mb-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-blue-500/20 rounded-full">
+                    <Award className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-blue-300 font-medium text-sm mb-1">Income Calculation Note</p>
+                    <p className="text-blue-200 text-sm">
+                      Only invoices with "approved" status are counted as income. This ensures accurate financial reporting based on confirmed business transactions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center p-4 border border-white/10 rounded-lg bg-black/20">
+                  <div className="text-2xl font-bold text-white mb-2">
+                    {formatCurrency(incomeStats.currentMonthIncome, business?.currency || 'INR')}
+                  </div>
+                  <p className="text-sm text-gray-300">Current Month Income</p>
+                  <p className="text-xs text-gray-400">From approved invoices</p>
+                </div>
+                
+                <div className="text-center p-4 border border-white/10 rounded-lg bg-black/20">
+                  <div className="text-2xl font-bold text-white mb-2">
+                    {formatCurrency(incomeStats.currentYearIncome, business?.currency || 'INR')}
+                  </div>
+                  <p className="text-sm text-gray-300">Current Year Income</p>
+                  <p className="text-xs text-gray-400">From approved invoices</p>
+                </div>
+                
+                <div className="text-center p-4 border border-white/10 rounded-lg bg-black/20">
+                  <div className="text-2xl font-bold text-white mb-2">
+                    {formatCurrency(incomeStats.totalIncome, business?.currency || 'INR')}
+                  </div>
+                  <p className="text-sm text-gray-300">Total Income</p>
+                  <p className="text-xs text-gray-400">All time from approved invoices</p>
                 </div>
               </div>
             </CardContent>
@@ -350,6 +442,15 @@ export default function BusinessDetailPage() {
                           >
                             <History className="w-3 h-3" />
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => handleDeleteProduct(product, e)}
+                            className="h-6 px-2 border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                            title="Delete product"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
                         </div>
                       </div>
                       <p className="text-sm text-gray-400 mb-2">
@@ -374,6 +475,16 @@ export default function BusinessDetailPage() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          isOpen={deleteDialog.isOpen}
+          onClose={() => setDeleteDialog({ isOpen: false, product: null })}
+          onConfirm={confirmDeleteProduct}
+          title="Delete Product"
+          description="Are you sure you want to delete this product? This action cannot be undone."
+          itemName={deleteDialog.product?.name || ''}
+        />
       </div>
     </div>
   );

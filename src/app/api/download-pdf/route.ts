@@ -29,6 +29,14 @@ interface Invoice {
   taxAmount?: number
   total?: number
   notes?: string
+  preferences?: {
+    columnHeaders?: {
+      item?: string
+      description?: string
+      quantity?: string
+      price?: string
+    }
+  }
 }
 
 interface Business {

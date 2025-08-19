@@ -8,10 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { updateInvoice, getBusinessProducts } from '@/lib/firebase';
-import type { Invoice, Business, Product } from '@/lib/firebase';
+import type { Invoice, Business, Product, InvoicePreferences } from '@/lib/firebase';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { Receipt, User, Package, Plus, Trash2, Save, X } from 'lucide-react';
+import { Receipt, User, Package, Plus, Trash2, Save, X, Settings } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { SimpleDateInput } from '@/components/ui/SimpleDateInput';
 
 interface EditInvoiceFormProps {
   invoice: Invoice;
@@ -46,11 +47,31 @@ export default function EditInvoiceForm({ invoice, business, onSuccess, onCancel
       zipCode: '',
       country: ''
     },
+    invoiceDate: invoice.invoiceDate ? invoice.invoiceDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
     items: invoice.items,
     discountRate: invoice.discountRate || 0,
     taxRate: invoice.taxRate || 0,
     notes: invoice.notes || ''
   });
+
+  // Separate state for address input to handle editing properly
+  const [addressInput, setAddressInput] = useState(
+    invoice.customerAddress ? 
+    `${invoice.customerAddress.street}, ${invoice.customerAddress.city}, ${invoice.customerAddress.state} ${invoice.customerAddress.zipCode}`.replace(/^,\s*/, '').replace(/,\s*$/, '') : 
+    ''
+  );
+
+  // Invoice preferences for column headers
+  const [preferences, setPreferences] = useState<InvoicePreferences>(
+    invoice.preferences || {
+      columnHeaders: {
+        item: 'Item',
+        description: 'Description',
+        quantity: 'Qty',
+        price: 'Price / Qty'
+      }
+    }
+  );
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -89,6 +110,7 @@ export default function EditInvoiceForm({ invoice, business, onSuccess, onCancel
         customerEmail: formData.customerEmail.trim(),
         customerPhone: formData.customerPhone.trim(),
         customerAddress: formData.customerAddress,
+        invoiceDate: new Date(formData.invoiceDate),
         items: formData.items,
         subtotal,
         discountRate: formData.discountRate,
@@ -96,7 +118,8 @@ export default function EditInvoiceForm({ invoice, business, onSuccess, onCancel
         taxAmount,
         total,
         taxRate: formData.taxRate,
-        notes: formData.notes.trim()
+        notes: formData.notes.trim(),
+        preferences
       };
 
       await updateInvoice(invoice.id!, updateData);
@@ -127,6 +150,28 @@ export default function EditInvoiceForm({ invoice, business, onSuccess, onCancel
       unitPrice: 0,
       total: 0,
       isCustom: true
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }));
+  };
+
+  const addProductItem = () => {
+    if (products.length === 0) return;
+
+    const firstProduct = products[0];
+    if (!firstProduct.id) return;
+
+    const newItem: InvoiceItem = {
+      productId: firstProduct.id,
+      productName: firstProduct.name,
+      description: firstProduct.description || '',
+      quantity: 1,
+      unitPrice: firstProduct.price,
+      total: firstProduct.price,
+      isCustom: false
     };
 
     setFormData(prev => ({
@@ -265,42 +310,134 @@ export default function EditInvoiceForm({ invoice, business, onSuccess, onCancel
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="customerPhone" className="text-white">Phone</Label>
-                <Input
-                  id="customerPhone"
-                  value={formData.customerPhone}
-                  onChange={(e) => handleInputChange('customerPhone', e.target.value)}
-                  placeholder="Enter customer phone"
-                  className="mt-1"
-                  disabled={loading}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="customerPhone" className="text-white">Phone</Label>
+                  <Input
+                    id="customerPhone"
+                    value={formData.customerPhone}
+                    onChange={(e) => handleInputChange('customerPhone', e.target.value)}
+                    placeholder="Enter customer phone"
+                    className="mt-1"
+                    disabled={loading}
+                  />
+                </div>
+                
+                                 <div>
+                   <Label htmlFor="invoiceDate" className="text-white">Invoice Date</Label>
+                                     <SimpleDateInput
+                    id="invoiceDate"
+                    value={formData.invoiceDate}
+                    onChange={(value) => handleInputChange('invoiceDate', value)}
+                    disabled={loading}
+                    className="mt-1"
+                  />
+                 </div>
               </div>
 
               <div>
                 <Label htmlFor="customerAddress" className="text-white">Address</Label>
                 <Textarea
                   id="customerAddress"
-                  value={`${formData.customerAddress.street}, ${formData.customerAddress.city}, ${formData.customerAddress.state} ${formData.customerAddress.zipCode}`}
+                  value={addressInput}
                   onChange={(e) => {
                     const address = e.target.value;
-                    const parts = address.split(',').map(p => p.trim());
-                    setFormData(prev => ({
-                      ...prev,
-                      customerAddress: {
-                        street: parts[0] || '',
-                        city: parts[1] || '',
-                        state: parts[2] || '',
-                        zipCode: parts[3] || '',
-                        country: parts[4] || 'United States'
-                      }
-                    }));
+                    setAddressInput(address);
                   }}
-                  placeholder="Enter customer address"
+                  onBlur={() => {
+                    // When user leaves the field, parse the address if it has commas
+                    if (addressInput.includes(',')) {
+                      const parts = addressInput.split(',').map(p => p.trim());
+                      setFormData(prev => ({
+                        ...prev,
+                        customerAddress: {
+                          street: parts[0] || '',
+                          city: parts[1] || '',
+                          state: parts[2] || '',
+                          zipCode: parts[3] || '',
+                          country: parts[4] || 'United States'
+                        }
+                      }));
+                    } else {
+                      // If no commas, store as street address
+                      setFormData(prev => ({
+                        ...prev,
+                        customerAddress: {
+                          ...prev.customerAddress,
+                          street: addressInput
+                        }
+                      }));
+                    }
+                  }}
+                  placeholder="Enter customer address (e.g., 123 Main St, City, State, ZIP)"
                   className="mt-1"
                   disabled={loading}
                   rows={2}
                 />
+              </div>
+            </div>
+
+            {/* Invoice Preferences */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Invoice Preferences
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 border border-white/10 rounded-lg bg-black/20">
+                <div>
+                  <Label className="text-white text-sm">Item Column Header</Label>
+                  <Input
+                    value={preferences.columnHeaders.item}
+                    onChange={(e) => setPreferences(prev => ({
+                      ...prev,
+                      columnHeaders: { ...prev.columnHeaders, item: e.target.value }
+                    }))}
+                    placeholder="Item"
+                    className="mt-1"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <Label className="text-white text-sm">Description Column Header</Label>
+                  <Input
+                    value={preferences.columnHeaders.description}
+                    onChange={(e) => setPreferences(prev => ({
+                      ...prev,
+                      columnHeaders: { ...prev.columnHeaders, description: e.target.value }
+                    }))}
+                    placeholder="Description"
+                    className="mt-1"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <Label className="text-white text-sm">Quantity Column Header</Label>
+                  <Input
+                    value={preferences.columnHeaders.quantity}
+                    onChange={(e) => setPreferences(prev => ({
+                      ...prev,
+                      columnHeaders: { ...prev.columnHeaders, quantity: e.target.value }
+                    }))}
+                    placeholder="Qty"
+                    className="mt-1"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <Label className="text-white text-sm">Price Column Header</Label>
+                  <Input
+                    value={preferences.columnHeaders.price}
+                    onChange={(e) => setPreferences(prev => ({
+                      ...prev,
+                      columnHeaders: { ...prev.columnHeaders, price: e.target.value }
+                    }))}
+                    placeholder="Price / Qty"
+                    className="mt-1"
+                    disabled={loading}
+                  />
+                </div>
               </div>
             </div>
 
@@ -311,16 +448,30 @@ export default function EditInvoiceForm({ invoice, business, onSuccess, onCancel
                   <Package className="w-5 h-5" />
                   Invoice Items
                 </h3>
-                <Button
-                  type="button"
-                  onClick={addItem}
-                  variant="outline"
-                  size="sm"
-                  disabled={loading}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Item
-                </Button>
+                <div className="flex gap-2">
+                  {products.length > 0 && (
+                    <Button
+                      type="button"
+                      onClick={addProductItem}
+                      variant="outline"
+                      size="sm"
+                      disabled={loading}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Product
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={addItem}
+                    variant="outline"
+                    size="sm"
+                    disabled={loading}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Item
+                  </Button>
+                </div>
               </div>
 
               {formData.items.length === 0 ? (
@@ -332,96 +483,102 @@ export default function EditInvoiceForm({ invoice, business, onSuccess, onCancel
               ) : (
                 <div className="space-y-4">
                   {formData.items.map((item, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="p-4 border border-white/10 rounded-lg bg-black/20"
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-                        <div className="md:col-span-2">
-                          <Label className="text-white">Product/Item Name</Label>
-                          {item.isCustom ? (
-                            <Input
-                              value={item.productName}
-                              onChange={(e) => updateItem(index, 'productName', e.target.value)}
-                              placeholder="Enter custom item name"
-                              className="mt-1"
-                              disabled={loading}
-                            />
-                          ) : (
-                            <select
-                              value={item.productId || ''}
-                              onChange={(e) => updateItem(index, 'productId', e.target.value)}
-                              className="mt-1 w-full px-3 py-2 bg-black/50 border border-white/20 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                              disabled={loading}
-                            >
-                              <option value="">Select a product</option>
-                              {products.map((product) => (
-                                <option key={product.id} value={product.id}>
-                                  {product.name} - {formatCurrency(product.price, business?.currency)}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                        
-                        <div className="md:col-span-2">
-                          <Label className="text-white">Description</Label>
-                          <Input
-                            value={item.description || ''}
-                            onChange={(e) => updateItem(index, 'description', e.target.value)}
-                            placeholder="Enter item description (optional)"
-                            className="mt-1"
-                            disabled={loading}
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label className="text-white">Quantity</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                            className="mt-1"
-                            disabled={loading}
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label className="text-white">Unit Price</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.unitPrice}
-                            onChange={(e) => updateItem(index, 'unitPrice', e.target.value)}
-                            className="mt-1"
-                            disabled={loading}
-                          />
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <Label className="text-white">Total</Label>
-                            <div className="mt-1 p-2 bg-gray-800 rounded text-white font-semibold">
-                              {formatCurrency(item.total, business?.currency)}
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            onClick={() => removeItem(index)}
-                            variant="outline"
-                            size="sm"
-                            className="text-red-400 hover:text-red-300"
-                            disabled={loading}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </motion.div>
+                                         <motion.div
+                       key={index}
+                       initial={{ opacity: 0, x: -20 }}
+                       animate={{ opacity: 1, x: 0 }}
+                       className="p-4 border border-white/10 rounded-lg bg-black/20"
+                     >
+                       {/* First Row: Product/Item Name and Description */}
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                         <div>
+                           <Label className="text-white">{preferences.columnHeaders.item}</Label>
+                           {item.isCustom ? (
+                             <Input
+                               value={item.productName}
+                               onChange={(e) => updateItem(index, 'productName', e.target.value)}
+                               placeholder="Enter custom item name"
+                               className="mt-1"
+                               disabled={loading}
+                             />
+                           ) : (
+                             <select
+                               value={item.productId || ''}
+                               onChange={(e) => updateItem(index, 'productId', e.target.value)}
+                               className="mt-1 w-full px-3 py-2 bg-black/50 border border-white/20 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                               disabled={loading}
+                             >
+                               <option value="">Select a product</option>
+                               {products.map((product) => (
+                                 <option key={product.id} value={product.id}>
+                                   {product.name} - {formatCurrency(product.price, business?.currency)}
+                                 </option>
+                               ))}
+                             </select>
+                           )}
+                         </div>
+                         
+                         <div>
+                           <Label className="text-white">{preferences.columnHeaders.description}</Label>
+                           <Input
+                             value={item.description || ''}
+                             onChange={(e) => updateItem(index, 'description', e.target.value)}
+                             placeholder="Enter item description (optional)"
+                             className="mt-1"
+                             disabled={loading}
+                           />
+                         </div>
+                       </div>
+
+                       {/* Second Row: Quantity, Price, Total, and Delete */}
+                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                         <div>
+                           <Label className="text-white">{preferences.columnHeaders.quantity}</Label>
+                           <Input
+                             type="number"
+                             min="1"
+                             value={item.quantity}
+                             onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                             className="mt-1"
+                             disabled={loading}
+                           />
+                         </div>
+                         
+                         <div>
+                           <Label className="text-white">{preferences.columnHeaders.price}</Label>
+                           <Input
+                             type="number"
+                             step="0.01"
+                             min="0"
+                             value={item.unitPrice}
+                             onChange={(e) => updateItem(index, 'unitPrice', e.target.value)}
+                             className="mt-1"
+                             disabled={loading}
+                           />
+                         </div>
+                         
+                         <div>
+                           <Label className="text-white">Total</Label>
+                           <div className="mt-1 p-2 bg-gray-800 rounded text-white font-semibold">
+                             {formatCurrency(item.total, business?.currency)}
+                           </div>
+                         </div>
+
+                         <div className="flex justify-end">
+                           <Button
+                             type="button"
+                             onClick={() => removeItem(index)}
+                             variant="outline"
+                             size="sm"
+                             className="text-red-400 hover:text-red-300 border-red-500/20 hover:bg-red-500/20"
+                             disabled={loading}
+                             title="Delete item"
+                           >
+                             <Trash2 className="w-4 h-4" />
+                           </Button>
+                         </div>
+                       </div>
+                     </motion.div>
                   ))}
                 </div>
               )}

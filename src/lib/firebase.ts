@@ -1,5 +1,5 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp, orderBy, deleteDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // Check if we're in the browser and if Firebase config is available
@@ -139,6 +139,15 @@ export interface InvoiceItem {
   isCustom?: boolean; // Flag to identify custom items
 }
 
+export interface InvoicePreferences {
+  columnHeaders: {
+    item: string;
+    description: string;
+    quantity: string;
+    price: string;
+  };
+}
+
 export interface Invoice {
   id?: string;
   businessId: string;
@@ -153,6 +162,7 @@ export interface Invoice {
     zipCode: string;
     country: string;
   };
+  invoiceDate: Date;
   items: InvoiceItem[];
   subtotal: number;
   discountRate: number; // Discount rate as percentage (e.g., 10 for 10%)
@@ -164,6 +174,7 @@ export interface Invoice {
   dueDate?: Date;
   paidAt?: Date;
   notes?: string;
+  preferences?: InvoicePreferences; // Invoice column header preferences
   createdAt: Date;
   updatedAt: Date;
 }
@@ -621,6 +632,7 @@ export const getInvoice = async (invoiceId: string): Promise<Invoice | null> => 
       ...invoiceData,
       createdAt: invoiceData.createdAt?.toDate() || new Date(),
       updatedAt: invoiceData.updatedAt?.toDate() || new Date(),
+      invoiceDate: invoiceData.invoiceDate?.toDate() || invoiceData.invoiceDate || new Date(),
     } as Invoice;
   } catch (error) {
     console.error('Error getting invoice:', error);
@@ -655,6 +667,7 @@ export const getUserInvoices = async (userEmail: string): Promise<Invoice[]> => 
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate() || new Date(),
       updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+      invoiceDate: doc.data().invoiceDate?.toDate() || doc.data().invoiceDate || new Date(),
     })) as Invoice[];
 
     // Sort on client side until index is created
@@ -703,6 +716,160 @@ export const updateInvoice = async (invoiceId: string, updates: Partial<Invoice>
     await updateDoc(invoiceRef, updateData);
   } catch (error) {
     console.error('Error updating invoice:', error);
+    throw error;
+  }
+};
+
+// Delete Functions
+export const deleteBusiness = async (businessId: string): Promise<void> => {
+  if (!db) {
+    throw new Error('Firebase not configured');
+  }
+
+  try {
+    // Delete the business document
+    await deleteDoc(doc(db, BILLING_COLLECTIONS.BUSINESSES, businessId));
+  } catch (error) {
+    console.error('Error deleting business:', error);
+    throw error;
+  }
+};
+
+export const deleteProduct = async (productId: string): Promise<void> => {
+  if (!db) {
+    throw new Error('Firebase not configured');
+  }
+
+  try {
+    // Delete the product document
+    await deleteDoc(doc(db, BILLING_COLLECTIONS.PRODUCTS, productId));
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    throw error;
+  }
+};
+
+export const deleteInvoice = async (invoiceId: string): Promise<void> => {
+  if (!db) {
+    throw new Error('Firebase not configured');
+  }
+
+  try {
+    // Delete the invoice document
+    await deleteDoc(doc(db, BILLING_COLLECTIONS.INVOICES, invoiceId));
+  } catch (error) {
+    console.error('Error deleting invoice:', error);
+    throw error;
+  }
+};
+
+// Income calculation functions
+export const getBusinessIncome = async (businessId: string): Promise<{
+  totalIncome: number;
+  currentMonthIncome: number;
+  currentYearIncome: number;
+}> => {
+  if (!db) {
+    throw new Error('Firebase not configured');
+  }
+
+  try {
+    const invoicesRef = collection(db, BILLING_COLLECTIONS.INVOICES);
+    const q = query(invoicesRef, where('businessId', '==', businessId), where('status', '==', 'approved'));
+    const querySnapshot = await getDocs(q);
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let totalIncome = 0;
+    let currentMonthIncome = 0;
+    let currentYearIncome = 0;
+
+    querySnapshot.docs.forEach(doc => {
+      const invoiceData = doc.data();
+      const invoiceDate = invoiceData.createdAt?.toDate() || new Date();
+      const amount = invoiceData.total || 0;
+
+      totalIncome += amount;
+
+      if (invoiceDate.getFullYear() === currentYear) {
+        currentYearIncome += amount;
+        
+        if (invoiceDate.getMonth() === currentMonth) {
+          currentMonthIncome += amount;
+        }
+      }
+    });
+
+    return {
+      totalIncome,
+      currentMonthIncome,
+      currentYearIncome
+    };
+  } catch (error) {
+    console.error('Error calculating business income:', error);
+    throw error;
+  }
+};
+
+export const getUserTotalIncome = async (userEmail: string): Promise<{
+  totalIncome: number;
+  currentMonthIncome: number;
+  currentYearIncome: number;
+}> => {
+  if (!db) {
+    throw new Error('Firebase not configured');
+  }
+
+  try {
+    // First get all businesses for the user
+    const businessesRef = collection(db, BILLING_COLLECTIONS.BUSINESSES);
+    const businessesQuery = query(businessesRef, where('userId', '==', userEmail));
+    const businessesSnapshot = await getDocs(businessesQuery);
+    
+    const businessIds = businessesSnapshot.docs.map(doc => doc.id);
+    
+    if (businessIds.length === 0) {
+      return { totalIncome: 0, currentMonthIncome: 0, currentYearIncome: 0 };
+    }
+
+    // Get all approved invoices for all businesses
+    const invoicesRef = collection(db, BILLING_COLLECTIONS.INVOICES);
+    const invoicesQuery = query(invoicesRef, where('businessId', 'in', businessIds), where('status', '==', 'approved'));
+    const invoicesSnapshot = await getDocs(invoicesQuery);
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let totalIncome = 0;
+    let currentMonthIncome = 0;
+    let currentYearIncome = 0;
+
+    invoicesSnapshot.docs.forEach(doc => {
+      const invoiceData = doc.data();
+      const invoiceDate = invoiceData.createdAt?.toDate() || new Date();
+      const amount = invoiceData.total || 0;
+
+      totalIncome += amount;
+
+      if (invoiceDate.getFullYear() === currentYear) {
+        currentYearIncome += amount;
+        
+        if (invoiceDate.getMonth() === currentMonth) {
+          currentMonthIncome += amount;
+        }
+      }
+    });
+
+    return {
+      totalIncome,
+      currentMonthIncome,
+      currentYearIncome
+    };
+  } catch (error) {
+    console.error('Error calculating user total income:', error);
     throw error;
   }
 };
