@@ -11,7 +11,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import BackgroundPattern from '@/components/ui/BackgroundPattern';
 import CreateProductForm from '@/components/products/CreateProductForm';
 import CreateInvoiceForm from '@/components/invoices/CreateInvoiceForm';
-import { Package, Plus, MapPin, Phone, Mail, Building2, DollarSign, Edit, History, Receipt } from 'lucide-react';
+import { Package, Plus, MapPin, Phone, Mail, Building2, Edit, History, Receipt } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { formatCurrency, formatDate } from '@/lib/utils';
 

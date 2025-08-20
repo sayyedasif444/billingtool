@@ -10,7 +10,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useRouter } from 'next/navigation';
 import { getUserBusinesses, getBusinessProducts, getUserTotalIncome } from '@/lib/firebase';
 import type { Business } from '@/lib/firebase';
-import { Building2, Package, DollarSign, Receipt, TrendingUp, Calendar, Award } from 'lucide-react';
+import { Building2, Package, Receipt, TrendingUp, Calendar } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 export const Dashboard = () => {

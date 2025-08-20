@@ -11,7 +11,7 @@ import { createProduct } from '@/lib/firebase';
 import type { Product } from '@/lib/firebase';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Package, DollarSign, Hash, Image as ImageIcon } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+
 
 interface CreateProductFormProps {
   businessId: string;

@@ -317,7 +317,7 @@ export default function BusinessDetailPage() {
                   <div>
                     <p className="text-blue-300 font-medium text-sm mb-1">Income Calculation Note</p>
                     <p className="text-blue-200 text-sm">
-                      Only invoices with "approved" status are counted as income. This ensures accurate financial reporting based on confirmed business transactions.
+                      Only invoices with &quot;approved&quot; status are counted as income. This ensures accurate financial reporting based on confirmed business transactions.
                     </p>
                   </div>
                 </div>

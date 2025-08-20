@@ -14,7 +14,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import BackgroundPattern from '@/components/ui/BackgroundPattern';
 import { Package, DollarSign, Hash, Image as ImageIcon, ArrowLeft, Save } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { formatCurrency } from '@/lib/utils';
+
 
 export default function ProductEditPage() {
   const { user, loading: authLoading } = useAuth();

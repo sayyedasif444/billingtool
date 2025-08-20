@@ -21,8 +21,7 @@ export function generateInvoiceEmailHTML(data: EmailTemplateData): string {
     </tr>
   `).join('');
 
-  const logoHTML = business.logo ? 
-    `<img src="${business.logo.startsWith('/') ? business.logo : `/${business.logo}`}" alt="${business.name} Logo" style="max-height: 60px; max-width: 120px; object-fit: contain;">` : '';
+
 
   return `
     <!DOCTYPE html>
