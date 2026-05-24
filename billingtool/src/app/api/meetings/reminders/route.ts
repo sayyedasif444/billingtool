@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbApi, Project, ProjectMeeting } from "@/lib/firebase/db";
+import { dbApi, Project, ProjectMeeting, Company } from "@/lib/firebase/db";
 import { sendEmail } from "@/lib/mail";
 
 export async function GET(req: NextRequest) {
@@ -40,13 +40,15 @@ export async function GET(req: NextRequest) {
       if (meetingsToRemind.length === 0) continue;
 
       // Get company info for this project (to get the email)
-      const company = await dbApi.getCompany(project.companyId);
+      const company = await dbApi.getCompany(project.companyId) as Company | null;
       if (!company || !company.email) continue;
+
+      const companyEmail = company.email;
 
       for (const meeting of meetingsToRemind) {
         try {
           await sendEmail({
-            to: company.email,
+            to: companyEmail,
             subject: `REMINDER: Meeting in 15 mins - ${meeting.title}`,
             text: `Hi, this is a reminder for your upcoming meeting.\n\nTitle: ${meeting.title}\nStarts at: ${new Date(meeting.startTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}\nLocation: ${meeting.location || 'Online'}\n${meeting.link ? `Link: ${meeting.link}` : ''}\n\nProject: ${project.name}`,
             html: `
@@ -65,15 +67,21 @@ export async function GET(req: NextRequest) {
           });
 
           // Mark as sent in DB
-          const updatedMeetings = project.meetings.map(m => 
+          const updatedMeetings: ProjectMeeting[] = project.meetings.map(m => 
             m.id === meeting.id 
-              ? { ...m, remindersSent: { ...m.remindersSent, email15: true } } 
+              ? { 
+                  ...m, 
+                  remindersSent: { 
+                    email15: true, 
+                    push: m.remindersSent?.push ?? false 
+                  } 
+                } 
               : m
           );
           await dbApi.updateProject(project.id!, { meetings: updatedMeetings });
           
           emailsSent++;
-          console.log(`[REMINDER_CRON] Sent reminder for "${meeting.title}" to ${company.email}`);
+          console.log(`[REMINDER_CRON] Sent reminder for "${meeting.title}" to ${companyEmail}`);
         } catch (err) {
           console.error(`[REMINDER_CRON] Failed to send reminder for ${meeting.id}:`, err);
         }

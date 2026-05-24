@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
-import { dbApi, Quotation, Client } from "@/lib/firebase/db";
+import { dbApi, Quotation, Client, Company } from "@/lib/firebase/db";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -32,14 +32,14 @@ export default function ViewQuotationPage({ params }: { params: Promise<{ id: st
           document.title = `Quotation_${qData.quotationNumber}`;
           
           // Fetch client
-          const cData = await dbApi.getClient(doc.clientId);
+          const cData = await dbApi.getClient(qData.clientId);
           setClient(cData as Client);
 
-          // Fetch company (priority to activeCompany, fallback to doc.companyId)
+          // Fetch company (priority to activeCompany, fallback to qData.companyId)
           if (activeCompany) {
             setCompany(activeCompany);
-          } else if (isPdfBypass && doc.companyId) {
-            const compData = await dbApi.getCompany(doc.companyId);
+          } else if (isPdfBypass && qData.companyId) {
+            const compData = await dbApi.getCompany(qData.companyId);
             setCompany(compData as Company);
           }
         }
