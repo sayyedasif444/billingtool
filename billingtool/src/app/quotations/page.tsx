@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { dbApi, Quotation, Client } from "@/lib/firebase/db";
+import { dbApi, Quotation, Client, Invoice } from "@/lib/firebase/db";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
-import { dbApi, Client, ColumnDef, TemplateDef } from "@/lib/firebase/db";
+import { dbApi, Client, ColumnDef, TemplateDef, Invoice, Quotation } from "@/lib/firebase/db";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
