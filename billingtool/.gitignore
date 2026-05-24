@@ -25,9 +25,6 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
-.env.development
-.env.test
-.env.production
 
 # vercel
 .vercel
@@ -37,38 +34,6 @@ yarn-error.log*
 next-env.d.ts
 
 # IDE
-.vscode
-.idea
-
-# Uploaded files
-/public/uploads/*
-!/public/uploads/
-!/public/uploads/business-logos/
-/public/uploads/business-logos/*
-!/public/uploads/business-logos/.gitkeep
-
-# Temporary files
-*.tmp
-*.temp
-.cache
-
-# Test data
-/test/data
-/test/fixtures
-
-# Logs
-*.log
-logs/
-
-# Email templates test data
-/src/lib/email-templates/__tests__/
-/src/lib/email-templates/__mocks__/
-/src/lib/email-templates/*.test.ts
-/src/lib/email-templates/*.spec.ts
-/src/lib/email-templates/test-*.ts
-/src/lib/email-templates/mock-*.ts
-/src/lib/email-templates/sample-*.ts
-*.test.email.ts
-*.test.email.html
-*.sample.email.ts
-*.sample.email.html
+.vscode/
+.idea/
+.vercel

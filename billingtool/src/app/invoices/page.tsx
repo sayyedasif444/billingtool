@@ -1,314 +1,198 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { getUserInvoices, getBusiness } from '@/lib/firebase';
-import type { Invoice, Business } from '@/lib/firebase';
-import { useAuth } from '@/contexts/AuthContext';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import BackgroundPattern from '@/components/ui/BackgroundPattern';
-import { Receipt, Search, Filter, Eye, Building2, Calendar, DollarSign } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { formatCurrency } from '@/lib/utils';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { dbApi, Invoice, Client } from "@/lib/firebase/db";
+import { useCompany } from "@/contexts/CompanyContext";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Receipt, Plus, Loader2, Trash2, Pencil, Eye, Mail } from "lucide-react";
+import { EmailModal } from "@/components/EmailModal";
 
 export default function InvoicesPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
+  const { activeCompany } = useCompany();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [businesses, setBusinesses] = useState<Record<string, Business>>({});
+  const [clients, setClients] = useState<Record<string, Client>>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [showMailModal, setShowMailModal] = useState(false);
 
-  const loadInvoices = useCallback(async () => {
+  const loadData = async () => {
+    if (!activeCompany) return;
+    setLoading(true);
     try {
-      setLoading(true);
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      const userInvoices = await getUserInvoices(user.email);
-      setInvoices(userInvoices);
-
-      // Get business details for each invoice
-      const businessIds = [...new Set(userInvoices.map(invoice => invoice.businessId))];
-      const businessDetails: Record<string, Business> = {};
+      const [iData, cData] = await Promise.all([
+        dbApi.getInvoices(activeCompany.id!),
+        dbApi.getClients(activeCompany.id!)
+      ]);
+      setInvoices(iData as Invoice[]);
       
-      for (const businessId of businessIds) {
-        const business = await getBusiness(businessId);
-        if (business) {
-          businessDetails[businessId] = business;
-        }
-      }
-      
-      setBusinesses(businessDetails);
+      const clientMap: Record<string, Client> = {};
+      (cData as Client[]).forEach(c => {
+        if (c.id) clientMap[c.id] = c;
+      });
+      setClients(clientMap);
     } catch (error) {
-      console.error('Error loading invoices:', error);
-      setError('Failed to load invoices');
+      
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  };
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-      loadInvoices();
-    }
-  }, [user, authLoading, router, loadInvoices]);
+    loadData();
+  }, [activeCompany]);
 
-  const handleInvoiceClick = (invoiceId: string) => {
-    router.push(`/invoices/${invoiceId}`);
-  };
+  const handleDelete = async (id: string) => {
+    const confirm = window.confirm("Are you sure you want to delete this invoice? This cannot be undone.");
+    if (!confirm) return;
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const handleStatusFilter = (status: string) => {
-    setStatusFilter(status);
-  };
-
-  const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = 
-      invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (invoice.customerEmail && invoice.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved':
-      case 'paid':
-        return 'bg-green-900/50 text-green-300';
-      case 'sent':
-        return 'bg-blue-900/50 text-blue-300';
-      case 'overdue':
-        return 'bg-red-900/50 text-red-300';
-      case 'cancelled':
-        return 'bg-gray-900/50 text-gray-300';
-      default:
-        return 'bg-gray-900/50 text-gray-300';
+    try {
+      await dbApi.deleteInvoice(id);
+      await loadData();
+    } catch (error) {
+      alert("Failed to delete invoice");
     }
   };
 
-  // Show loading while auth is being checked or data is loading
-  if (authLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-black relative">
-        <BackgroundPattern />
-        <div className="text-center relative z-10">
-          <LoadingSpinner size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-300">Loading invoices...</p>
-        </div>
-      </div>
-    );
+  const handleStatusUpdate = async (id: string, newStatus: Invoice["status"]) => {
+    try {
+      await dbApi.updateInvoice(id, { status: newStatus });
+      await loadData();
+    } catch (error) {
+      alert("Failed to update status");
+    }
+  };
+
+  const openMailModal = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowMailModal(true);
+  };
+
+  if (!activeCompany) {
+    return <div className="p-8 text-center text-muted-foreground">Please create or select a company first.</div>;
   }
 
-  // If no user after auth loading is complete, show redirect message
-  if (!user) {
+  if (loading && invoices.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black relative">
-        <BackgroundPattern />
-        <div className="text-center relative z-10">
-          <LoadingSpinner size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-300">Redirecting to login...</p>
-        </div>
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black relative p-6">
-      <BackgroundPattern />
-      <div className="max-w-7xl mx-auto relative z-10">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">All Invoices</h1>
-              <p className="text-gray-300">View and manage all your invoices</p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Search and Filters */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="mb-6"
-        >
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  type="text"
-                  placeholder="Search invoices by number, customer name, or email..."
-                  value={searchTerm}
-                  onChange={handleSearch}
-                  className="pl-10 bg-black/50 border-white/20 text-white placeholder-gray-400"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant={statusFilter === 'all' ? 'default' : 'outline'}
-                onClick={() => handleStatusFilter('all')}
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                All
-              </Button>
-              <Button
-                variant={statusFilter === 'draft' ? 'default' : 'outline'}
-                onClick={() => handleStatusFilter('draft')}
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                Draft
-              </Button>
-              <Button
-                variant={statusFilter === 'approved' ? 'default' : 'outline'}
-                onClick={() => handleStatusFilter('approved')}
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                Approved
-              </Button>
-              <Button
-                variant={statusFilter === 'sent' ? 'default' : 'outline'}
-                onClick={() => handleStatusFilter('sent')}
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                Sent
-              </Button>
-              <Button
-                variant={statusFilter === 'paid' ? 'default' : 'outline'}
-                onClick={() => handleStatusFilter('paid')}
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                Paid
-              </Button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Invoices List */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          {error && (
-            <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-lg text-red-200">
-              {error}
-            </div>
-          )}
-
-          {filteredInvoices.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="mx-auto w-24 h-24 bg-gray-900/50 rounded-full flex items-center justify-center mb-6">
-                <Receipt className="w-12 h-12 text-gray-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-2">
-                {invoices.length === 0 ? 'No Invoices Found' : 'No Invoices Match Your Search'}
-              </h3>
-              <p className="text-gray-400">
-                {invoices.length === 0 
-                  ? 'You haven\'t created any invoices yet. Start by creating an invoice for your business.'
-                  : 'Try adjusting your search terms or filters.'
-                }
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {filteredInvoices.map((invoice, index) => (
-                <motion.div
-                  key={invoice.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Card 
-                    className="shadow-lg border-white/20 hover:border-white/40 transition-all duration-200 cursor-pointer hover:shadow-xl"
-                    onClick={() => handleInvoiceClick(invoice.id!)}
-                  >
-                    <CardContent className="p-6">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-white">
-                              Invoice #{invoice.invoiceNumber}
-                            </h3>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(invoice.status)}`}>
-                              {invoice.status.toUpperCase()}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center gap-4 text-gray-300 text-sm">
-                            <div className="flex items-center gap-1">
-                              <Building2 className="w-4 h-4" />
-                              <span>{businesses[invoice.businessId]?.name || 'Unknown Business'}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>{invoice.createdAt.toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-2">
-                            <p className="text-white font-medium">{invoice.customerName}</p>
-                            {invoice.customerEmail && (
-                              <p className="text-gray-400 text-sm">{invoice.customerEmail}</p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="w-4 h-4 text-green-400" />
-                            <span className="text-xl font-bold text-white">
-                              {formatCurrency(invoice.total, businesses[invoice.businessId]?.currency || 'INR')}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-400 text-sm">
-                              {invoice.items.length} item{invoice.items.length !== 1 ? 's' : ''}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-white/20 text-white hover:bg-white/10"
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </motion.div>
+    <div className="p-4 md:p-8 w-full space-y-8 animate-in fade-in duration-500 pb-24">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Receipt className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+            Invoices
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">
+            Generate and track invoices. Emails are sent manually.
+          </p>
+        </div>
+        <Link href="/invoices/new" className="w-full sm:w-auto">
+          <Button className="gap-2 w-full">
+            <Plus className="h-4 w-4" /> Create Invoice
+          </Button>
+        </Link>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {invoices.length === 0 && !loading && (
+          <div className="col-span-full py-12 text-center text-muted-foreground border border-dashed border-white/10 rounded-xl bg-white/5">
+            No invoices found. Create one directly or from a Quotation.
+          </div>
+        )}
+
+        {invoices.map(invoice => (
+          <Card key={invoice.id} className="hover:border-white/20 transition-all duration-300 group flex flex-col">
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-mono text-muted-foreground bg-white/5 px-2 py-1 rounded">
+                  {invoice.invoiceNumber}
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => openMailModal(invoice)} className="p-1 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded" title="Mail Invoice">
+                      <Mail className="h-3 w-3" />
+                    </button>
+                    <Link href={`/invoices/${invoice.id}`}>
+                      <button className="p-1 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded">
+                        <Eye className="h-3 w-3" />
+                      </button>
+                    </Link>
+                    <Link href={`/invoices/new?edit=${invoice.id}`}>
+                      <button className="p-1 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded">
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    </Link>
+                    <button onClick={() => handleDelete(invoice.id!)} className="p-1 text-red-400 hover:text-red-500 bg-red-500/5 hover:bg-red-500/10 rounded">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <CardTitle className="text-lg">
+                Amount: {(() => {
+                  const symbols: Record<string, string> = { 'USD': '$', 'INR': '₹', 'EUR': '€', 'GBP': '£' };
+                  return symbols[invoice.currency || 'USD'] || invoice.currency || '$';
+                })()} {invoice.amount.toLocaleString()}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm flex-1 flex flex-col">
+              <div>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold tracking-wider ${
+                  invoice.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' :
+                  invoice.status === 'sent' ? 'bg-blue-500/20 text-blue-400' :
+                  'bg-slate-500/20 text-slate-400'
+                }`}>
+                  {invoice.status.toUpperCase()}
+                </span>
+              </div>
+              <div className="text-slate-400">
+                Client: <span className="text-slate-200 font-medium">{clients[invoice.clientId]?.name || 'Unknown'}</span>
+              </div>
+              <div className="flex justify-between items-end border-t border-white/5 pt-4 flex-1">
+                <div>
+                  <div className="text-muted-foreground text-xs mb-1">Type</div>
+                  <div className="font-medium text-slate-300">
+                    {invoice.isIndependent ? 'Direct' : 'Quotation Linked'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button variant="outline" size="sm" className="w-full text-xs gap-2" onClick={() => openMailModal(invoice)}>
+                  <Mail className="h-3 w-3" /> Mail
+                </Button>
+                {invoice.status === "draft" && (
+                  <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleStatusUpdate(invoice.id!, "sent")}>
+                    Mark Sent
+                  </Button>
+                )}
+                {invoice.status === "sent" && (
+                  <Button variant="secondary" size="sm" className="w-full text-xs bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" onClick={() => handleStatusUpdate(invoice.id!, "paid")}>
+                    Mark Paid
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {selectedInvoice && (
+        <EmailModal 
+          isOpen={showMailModal}
+          onClose={() => setShowMailModal(false)}
+          type="INV"
+          document={selectedInvoice}
+          company={activeCompany}
+          client={clients[selectedInvoice.clientId]}
+        />
+      )}
     </div>
   );
-} 
+}

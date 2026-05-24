@@ -1,44 +1,47 @@
-import type { Metadata } from "next";
-import { DM_Sans } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
-import { AuthProvider } from "@/contexts/AuthContext";
-import Navbar from "@/components/layout/Navbar";
 
-const dmSans = DM_Sans({ 
-  subsets: ['latin'],
-  weight: ['400', '500', '700'],
-  variable: '--font-dm-sans',
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://billing.devanddebate.com'),
-  title: {
-    template: '%s | Dev & Debate Billing Tool',
-    default: 'Dev & Debate Billing Tool - Business Management & Invoicing'
+  title: "Freelancer Pro",
+  description: "Advanced billing and quotation tool for freelancers",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Freelancer Pro",
   },
-  description: 'Streamline your business operations with our comprehensive billing and invoicing solution. Manage businesses, products, and sales with ease.',
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "application-name": "Freelancer Pro",
+    "apple-mobile-web-app-title": "Freelancer Pro",
+    "msapplication-starturl": "/",
+    "msapplication-TileColor": "#020617",
+  },
   icons: {
-    icon: [{ url: '/api/favicon' }],
-  },
-  openGraph: {
-    title: 'Dev & Debate Billing Tool - Business Management & Invoicing',
-    description: 'Streamline your business operations with our comprehensive billing and invoicing solution. Manage businesses, products, and sales with ease.',
-    url: 'https://billing.devanddebate.com',
-    siteName: 'Dev & Debate Billing Tool',
-    locale: 'en_US',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Dev & Debate Billing Tool',
-    description: 'Business Management & Invoicing Solution',
-    creator: '@devanddebate',
-  },
-  robots: {
-    index: true,
-    follow: true,
+    icon: "/images/logo-main.png",
+    shortcut: "/images/logo-main.png",
+    apple: "/images/logo-main.png",
   },
 };
+
+export const viewport: Viewport = {
+  themeColor: "#020617",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
+import { AppProviders } from "@/components/providers/AppProviders";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function RootLayout({
   children,
@@ -46,18 +49,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head />
-      <body 
-        className={`min-h-screen bg-black text-white antialiased ${dmSans.variable}`}
-        suppressHydrationWarning={true}
-      >
-        <AuthProvider>
-          <Navbar />
-          <div className="pt-16">
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className={`${inter.className} h-screen overflow-hidden bg-background antialiased flex`} suppressHydrationWarning>
+        <AppProviders>
+          <MainLayout>
             {children}
-          </div>
-        </AuthProvider>
+          </MainLayout>
+          <Script
+            id="register-sw"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                if ('serviceWorker' in navigator) {
+                  window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                      console.log('ServiceWorker registration successful');
+                    }).catch(function(err) {
+                      console.log('ServiceWorker registration failed: ', err);
+                    });
+                  });
+                }
+              `,
+            }}
+          />
+        </AppProviders>
       </body>
     </html>
   );
