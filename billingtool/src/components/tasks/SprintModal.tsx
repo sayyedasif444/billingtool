@@ -14,9 +14,10 @@ interface SprintModalProps {
   sprint?: Sprint | null;
   projectId: string;
   onDelete?: (sprintId: string) => Promise<void>;
+  hasTasks?: boolean;
 }
 
-export function SprintModal({ isOpen, onClose, onSave, sprint, projectId, onDelete }: SprintModalProps) {
+export function SprintModal({ isOpen, onClose, onSave, sprint, projectId, onDelete, hasTasks = false }: SprintModalProps) {
   const [formData, setFormData] = useState<Partial<Sprint>>({
     projectId,
     startDate: new Date().toISOString().split("T")[0],
@@ -54,7 +55,13 @@ export function SprintModal({ isOpen, onClose, onSave, sprint, projectId, onDele
 
   const handleDelete = async () => {
     if (!sprint?.id || !onDelete) return;
-    if (!confirm("Are you sure you want to delete this sprint? All tasks inside will be moved to the backlog. This action cannot be undone.")) return;
+
+    if (hasTasks) {
+      alert("Cannot delete sprint because there are tasks assigned to it. Please move or delete the tasks first.");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to delete this sprint? This action cannot be undone.")) return;
 
     setIsDeleting(true);
     try {
@@ -104,7 +111,14 @@ export function SprintModal({ isOpen, onClose, onSave, sprint, projectId, onDele
           <div className="flex justify-between items-center pt-4 border-t border-white/10 mt-6">
             <div>
               {sprint && onDelete && (
-                <Button type="button" variant="destructive" onClick={handleDelete} disabled={isDeleting || isSaving}>
+                <Button 
+                  type="button" 
+                  variant="destructive" 
+                  onClick={handleDelete} 
+                  disabled={isDeleting || isSaving}
+                  className={hasTasks ? "opacity-50 cursor-not-allowed" : ""}
+                  title={hasTasks ? "Cannot delete sprint because there are tasks assigned to it" : undefined}
+                >
                   {isDeleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : "Delete Sprint"}
                 </Button>
               )}

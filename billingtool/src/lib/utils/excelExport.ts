@@ -51,7 +51,8 @@ function formatFirestoreTimestamp(timestamp: any): string {
 export async function exportTasksToExcel(
   project: Project | null,
   activeSprint: Sprint | undefined,
-  tasks: Task[]
+  tasks: Task[],
+  sprints: Sprint[] = []
 ) {
   // Dynamically import xlsx-js-style for client-side Excel styling
   const XLSX = await import("xlsx-js-style");
@@ -59,13 +60,23 @@ export async function exportTasksToExcel(
   const projectName = project?.name || "Project";
   
   // Format only the date range of the sprint (Start Date - End Date)
-  const sprintLabel = activeSprint
-    ? `${new Date(activeSprint.startDate).toLocaleDateString()} - ${new Date(activeSprint.endDate).toLocaleDateString()}`
-    : "Backlog";
+  let sprintLabel = "Backlog";
+  let headerTitle = "Sprint Plan - Backlog";
+  let sprintNumber = -1;
 
-  const headerTitle = activeSprint
-    ? `Sprint Plan ${sprintLabel}`
-    : "Sprint Plan - Backlog";
+  if (activeSprint) {
+    // Sort all sprints chronologically to find the correct Sprint Number
+    const sorted = [...sprints].sort(
+      (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+    );
+    const sprintIndex = sorted.findIndex(s => s.id === activeSprint.id);
+    sprintNumber = sprintIndex !== -1 ? sprintIndex + 1 : -1;
+    const sprintNumStr = sprintNumber !== -1 ? `Sprint ${sprintNumber}` : "Sprint";
+
+    const formattedDates = `${new Date(activeSprint.startDate).toLocaleDateString()} - ${new Date(activeSprint.endDate).toLocaleDateString()}`;
+    sprintLabel = `${sprintNumStr} (${formattedDates})`;
+    headerTitle = `Sprint Plan ${sprintLabel}`;
+  }
 
   // Set up workbook structure with metadata rows (No Task ID column)
   const rows: any[][] = [
@@ -236,9 +247,12 @@ export async function exportTasksToExcel(
 
   // Generate safe filename using date range
   const safeProjectName = projectName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-  const safeSprintName = activeSprint
-    ? `sprint_${activeSprint.startDate}_to_${activeSprint.endDate}`
-    : "backlog";
+  
+  let safeSprintName = "backlog";
+  if (activeSprint) {
+    const sprintNumPrefix = sprintNumber !== -1 ? `sprint_${sprintNumber}_` : "sprint_";
+    safeSprintName = `${sprintNumPrefix}${activeSprint.startDate}_to_${activeSprint.endDate}`;
+  }
   const filename = `${safeProjectName}_${safeSprintName}_tasks.xlsx`;
 
   // Write file and trigger download

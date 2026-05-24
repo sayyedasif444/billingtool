@@ -316,8 +316,8 @@ export function TaskModal({ isOpen, onClose, onSave, task, projectId, sprints, o
                       className="flex h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value="" className="bg-slate-900">Backlog (No Sprint)</option>
-                      {sprints.map(s => (
-                        <option key={s.id} value={s.id}>{new Date(s.startDate).toLocaleDateString()} - {new Date(s.endDate).toLocaleDateString()}</option>
+                      {sprints.map((s, index) => (
+                        <option key={s.id} value={s.id}>Sprint {index + 1} ({new Date(s.startDate).toLocaleDateString()} - {new Date(s.endDate).toLocaleDateString()})</option>
                       ))}
                     </select>
                   </div>

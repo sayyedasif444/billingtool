@@ -61,7 +61,24 @@ export function KanbanCard({ task, onClick }: KanbanCardProps) {
         <div className="flex items-center gap-1">
           <Clock className="h-3 w-3" />
           <span>
-             {task.createdAt ? new Date((task.createdAt as any).toMillis ? (task.createdAt as any).toMillis() : task.createdAt).toLocaleDateString() : 'New'}
+             {(() => {
+               if (!task.createdAt) return 'New';
+               try {
+                 let date: Date;
+                 if ((task.createdAt as any).toDate && typeof (task.createdAt as any).toDate === 'function') {
+                   date = (task.createdAt as any).toDate();
+                 } else if ((task.createdAt as any).toMillis && typeof (task.createdAt as any).toMillis === 'function') {
+                   date = new Date((task.createdAt as any).toMillis());
+                 } else if ((task.createdAt as any).seconds !== undefined) {
+                   date = new Date((task.createdAt as any).seconds * 1000);
+                 } else {
+                   date = new Date(task.createdAt as any);
+                 }
+                 return isNaN(date.getTime()) ? 'New' : date.toLocaleDateString();
+               } catch (e) {
+                 return 'New';
+               }
+             })()}
           </span>
         </div>
         {task.estimatedDays !== undefined && (

@@ -50,9 +50,10 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
         setSprints(sData);
         setTasks(tData);
 
-        // Auto select first sprint if any
+        // Auto select first sprint if any (sorted chronologically)
         if (sData.length > 0) {
-          setActiveSprintId(sData[0].id!);
+          const sorted = [...sData].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+          setActiveSprintId(sorted[0].id!);
         }
       } catch (error) {
         console.error("Failed to load task data:", error);
@@ -85,6 +86,10 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   const activeSprint = useMemo(() => {
     return sprints.find(s => s.id === activeSprintId);
   }, [sprints, activeSprintId]);
+
+  const sortedSprints = useMemo(() => {
+    return [...sprints].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  }, [sprints]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -149,17 +154,17 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   };
 
   const handleDeleteSprint = async (sprintId: string) => {
-    // 1. Find all tasks in this sprint and move them to backlog
-    const tasksInSprint = tasks.filter(t => t.sprintId === sprintId);
+    // Check if there are tasks assigned to this sprint
+    const hasTasks = tasks.some(t => t.sprintId === sprintId);
+    if (hasTasks) {
+      alert("Cannot delete sprint because there are tasks assigned to it.");
+      return;
+    }
     
-    await Promise.all([
-      dbApi.deleteSprint(sprintId),
-      ...tasksInSprint.map(t => dbApi.updateTask(t.id!, { sprintId: "", status: "Proposed" }))
-    ]);
+    await dbApi.deleteSprint(sprintId);
 
     // 2. Update local state
     setSprints(prev => prev.filter(s => s.id !== sprintId));
-    setTasks(prev => prev.map(t => t.sprintId === sprintId ? { ...t, sprintId: "", status: "Proposed" } : t));
     
     // 3. Reset active sprint view
     if (activeSprintId === sprintId) {
@@ -174,7 +179,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
   const handleExportExcel = async () => {
     try {
-      await exportTasksToExcel(project, activeSprint, currentTasks);
+      await exportTasksToExcel(project, activeSprint, currentTasks, sortedSprints);
     } catch (error) {
       console.error("Failed to export Excel:", error);
       alert("Failed to export Excel spreadsheet.");
@@ -219,8 +224,10 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
               className="h-10 rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary w-[200px]"
             >
               <option value="">Backlog (No Sprint)</option>
-              {sprints.map(s => (
-                <option key={s.id} value={s.id}>{new Date(s.startDate).toLocaleDateString()} - {new Date(s.endDate).toLocaleDateString()}</option>
+              {sortedSprints.map((s, index) => (
+                <option key={s.id} value={s.id}>
+                  Sprint {index + 1} ({new Date(s.startDate).toLocaleDateString()} - {new Date(s.endDate).toLocaleDateString()})
+                </option>
               ))}
             </select>
 
@@ -311,6 +318,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
         onDelete={handleDeleteSprint}
         sprint={editingSprint}
         projectId={projectId}
+        hasTasks={editingSprint ? tasks.some(t => t.sprintId === editingSprint.id) : false}
       />
 
       <TaskModal 
@@ -320,7 +328,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
         onDelete={handleDeleteTask}
         task={editingTask}
         projectId={projectId}
-        sprints={sprints}
+        sprints={sortedSprints}
       />
 
       <ShareFormModal
