@@ -366,7 +366,24 @@ export default function TemplatesPage() {
                         <label className="text-xs text-slate-400">Value Type</label>
                         <select 
                           value={col.type}
-                          onChange={e => updateColumn(col.id, "type", e.target.value as any)}
+                          onChange={e => {
+                            const newType = e.target.value as any;
+                            if (!templateData) return;
+                            setTemplateData({
+                              ...templateData,
+                              columns: templateData.columns.map(c => {
+                                if (c.id !== col.id) return c;
+                                const updated = { ...c, type: newType };
+                                if (newType === "text") {
+                                  delete updated.isTotal;
+                                  delete updated.formula;
+                                } else if (newType === "number") {
+                                  delete updated.formula;
+                                }
+                                return updated;
+                              })
+                            });
+                          }}
                           className="flex h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary"
                         >
                           <option value="text" className="bg-slate-900">Text</option>

@@ -67,7 +67,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         setActiveCompanyState(data[0] as Company);
       }
     } catch (error) {
-      
+      console.error("Error loading companies from Firestore:", error);
     } finally {
       setLoading(false);
     }

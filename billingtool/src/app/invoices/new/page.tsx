@@ -98,18 +98,28 @@ function InvoiceForm() {
             setMode(inv.isIndependent ? "direct" : "linked");
             setSelectedProjectId(inv.projectId || "");
             setInvoiceNumber(inv.invoiceNumber);
+            setSelectedClientId(inv.clientId);
+            setSelectedTemplateId(inv.templateId || "");
             
-            if (inv.isIndependent) {
-              setSelectedClientId(inv.clientId);
+            // Restore custom columns if they exist
+            if (inv.columns && inv.columns.length > 0) {
+              setColumns(inv.columns);
+            } else {
+              // Fallback
               const client = (cData as Client[]).find(c => c.id === inv.clientId);
               if (client) {
                 const templates = client.templates || [];
-                if (templates.length > 0) {
-                  setSelectedTemplateId(templates[0].id);
-                  setColumns(templates[0].columns || defaultColumns);
+                const activeTpl = templates.find(t => t.id === inv.templateId) || templates[0];
+                if (activeTpl) {
+                  setSelectedTemplateId(activeTpl.id);
+                  setColumns(activeTpl.columns || defaultColumns);
+                } else {
+                  setColumns(defaultColumns);
                 }
               }
-              
+            }
+            
+            if (inv.isIndependent) {
               if (inv.dynamicRows && inv.dynamicRows.length > 0) {
                 setDynamicRows(inv.dynamicRows);
               } else if (inv.lineItems) {
@@ -124,6 +134,11 @@ function InvoiceForm() {
             } else {
               const q = allQuotes.find(q => q.id === inv.quotationId);
               if (q) setSelectedQuotation(q);
+              
+              if (inv.dynamicRows && inv.dynamicRows.length > 0) {
+                setDynamicRows(inv.dynamicRows);
+              }
+              
               if (inv.linkedItems) {
                 setSelectedItems(inv.linkedItems);
               } else if (inv.linkedPhases) {
@@ -206,7 +221,6 @@ function InvoiceForm() {
 
   const handleTemplateChange = (tplId: string, client?: Client) => {
     setSelectedTemplateId(tplId);
-    if (editId) return; // Don't overwrite when editing
     
     const currentClient = client || clients.find(c => c.id === selectedClientId);
     if (!currentClient || !currentClient.templates) return;
@@ -239,6 +253,9 @@ function InvoiceForm() {
   const handleQuotationSelect = (q: Quotation, allClients: Client[] = clients, count = 0, invList: Invoice[] = allInvoices, cols: ColumnDef[] = columns) => {
     setSelectedQuotation(q);
     if (q.currency) setCurrency(q.currency);
+    
+    setSelectedClientId(q.clientId);
+    const client = allClients.find(c => c.id === q.clientId);
     
     // Use provided columns or fallback to state
     const activeCols = cols.length > 0 ? cols : columns;
@@ -288,13 +305,10 @@ function InvoiceForm() {
     
     // Auto-inherit project and template from Quotation
     if (q.projectId) setSelectedProjectId(q.projectId);
-    if (q.templateId) handleTemplateChange(q.templateId);
+    if (q.templateId && client) handleTemplateChange(q.templateId, client);
 
-    if (!editId) {
-      const client = allClients.find(c => c.id === q.clientId);
-      if (client) {
-        setInvoiceNumber(generateRefNumber(activeCompany?.name || "", client.name, "INV", count));
-      }
+    if (!editId && client) {
+      setInvoiceNumber(generateRefNumber(activeCompany?.name || "", client.name, "INV", count));
     }
   };
 
@@ -400,6 +414,7 @@ function InvoiceForm() {
         currency: currency || "USD",
         isIndependent: mode === "direct",
         templateId: selectedTemplateId,
+        columns: columns,
       };
 
       if (selectedProjectId) {

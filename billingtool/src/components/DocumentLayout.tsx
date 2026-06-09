@@ -38,22 +38,39 @@ export function DocumentLayout({
   let bottomSection = showBottomSection ? ((document as any)?.bottomSection) : null;
 
   const effectiveTemplateId = document.templateId || linkedQuotation?.templateId;
+  let activeTemplate = null;
 
-  if (columns.length === 0 && effectiveTemplateId && client.templates) {
-    const activeTemplate = client.templates.find(t => t.id === effectiveTemplateId);
-    if (activeTemplate) {
+  if (effectiveTemplateId && client.templates) {
+    activeTemplate = client.templates.find(t => t.id === effectiveTemplateId);
+  }
+
+  if (!activeTemplate && client.templates && client.templates.length > 0) {
+    activeTemplate = client.templates[0];
+  }
+
+  if (activeTemplate) {
+    if (columns.length === 0) {
       columns = activeTemplate.columns || [];
-      if (!topSection && showTopSection) topSection = activeTemplate.topSection;
-      if (!bottomSection && showBottomSection) bottomSection = activeTemplate.bottomSection;
+    }
+    if (!topSection && showTopSection) {
+      topSection = activeTemplate.topSection;
+    }
+    if (!bottomSection && showBottomSection) {
+      bottomSection = activeTemplate.bottomSection;
     }
   }
 
   if (columns.length === 0) {
-    if (client?.templates && client.templates.length > 0) {
-      columns = client.templates[0].columns || [];
-    } else if ((client as any)?.template?.columns) {
+    if ((client as any)?.template?.columns) {
       columns = (client as any).template.columns;
     }
+  }
+
+  if (!topSection && showTopSection && (client as any)?.template?.topSection) {
+    topSection = (client as any).template.topSection;
+  }
+  if (!bottomSection && showBottomSection && (client as any)?.template?.bottomSection) {
+    bottomSection = (client as any).template.bottomSection;
   }
 
   const rows = document.dynamicRows || 
@@ -79,7 +96,39 @@ export function DocumentLayout({
     }
   }
 
-  const amountColIndex = columns.findIndex(c => c.label.toLowerCase().includes("amount") || c.label.toLowerCase().includes("total"));
+  // Find the index of the main total/amount column
+  // 1. First priority: columns marked with isTotal (excluding ones that are clearly not currency, like hours/days/qty)
+  let amountColIndex = columns.findIndex(c => {
+    if (!c.isTotal) return false;
+    const lbl = c.label.toLowerCase();
+    const hasQualifier = lbl.includes("hrs") || lbl.includes("hours") || lbl.includes("days") || lbl.includes("qty") || lbl.includes("quantity");
+    return !hasQualifier;
+  });
+
+  // 2. Second priority: exact match on "total" or "amount"
+  if (amountColIndex === -1) {
+    amountColIndex = columns.findIndex(c => {
+      const lbl = c.label.toLowerCase().trim();
+      return lbl === "total" || lbl === "amount";
+    });
+  }
+
+  // 3. Third priority: contains total or amount but does not have qualifiers
+  if (amountColIndex === -1) {
+    amountColIndex = columns.findIndex(c => {
+      const lbl = c.label.toLowerCase();
+      const isTotalOrAmt = lbl.includes("total") || lbl.includes("amount");
+      const hasQualifier = lbl.includes("hrs") || lbl.includes("hours") || lbl.includes("days") || lbl.includes("rate") || lbl.includes("price") || lbl.includes("qty") || lbl.includes("quantity");
+      return isTotalOrAmt && !hasQualifier;
+    });
+  }
+
+  // 4. Fourth priority: any column containing amount or total
+  if (amountColIndex === -1) {
+    amountColIndex = columns.findIndex(c => c.label.toLowerCase().includes("amount") || c.label.toLowerCase().includes("total"));
+  }
+
+  const mainAmtCol = amountColIndex !== -1 ? columns[amountColIndex] : null;
   let finalColumns = [...columns];
   if (amountColIndex !== -1 && amountColIndex !== finalColumns.length - 1) {
      const amtCol = finalColumns.splice(amountColIndex, 1)[0];
@@ -151,10 +200,10 @@ export function DocumentLayout({
           <thead>
             <tr className="border-b-2 border-gray-900">
               {finalColumns.map((col, idx) => {
-                const isAmount = col.label.toLowerCase().includes("amount") || col.label.toLowerCase().includes("total");
+                const isMainAmount = mainAmtCol && col.id === mainAmtCol.id;
                 const isNumber = col.type === "number" || col.type === "calculated";
                 return (
-                  <th key={col.id} className={`py-1.5 text-[13px] font-bold text-gray-900 ${isAmount || isNumber ? "text-right" : ""}`}>
+                  <th key={col.id} className={`py-1.5 text-[13px] font-bold text-gray-900 ${isMainAmount || isNumber ? "text-right" : ""}`}>
                     {col.label}
                   </th>
                 );
@@ -165,24 +214,21 @@ export function DocumentLayout({
             {rows.map((row: any, i: number) => (
               <tr key={row.id || i} className="border-b border-gray-50 last:border-b-0">
                 {finalColumns.map((col, idx) => {
-                  const isAmount = col.label.toLowerCase().includes("amount") || col.label.toLowerCase().includes("total");
+                  const isMainAmount = mainAmtCol && col.id === mainAmtCol.id;
                   const isNumber = col.type === "number" || col.type === "calculated";
                   const val = row[col.id] ?? row[col.label.toLowerCase()] ?? "";
                   let displayVal = val;
-                  if (isAmount) {
+                  
+                  if (isMainAmount) {
                     const numericVal = Number(val) || 0;
-                    // If it's 0 but it's a calculated column, try to find another numeric value in the row as fallback
-                    if (numericVal === 0 && col.type === "calculated") {
-                       const otherNum = Object.entries(row).find(([k, v]) => k !== col.id && (typeof v === 'string' || typeof v === 'number') && !isNaN(Number(v)) && Number(v) > 0);
-                       displayVal = otherNum ? Number(otherNum[1]) : 0;
-                    } else {
-                       displayVal = numericVal;
-                    }
-                    displayVal = `${currency} ${Number(displayVal).toLocaleString()}`;
+                    displayVal = `${currency} ${numericVal.toLocaleString()}`;
+                  } else if (isNumber && val !== "") {
+                    const numericVal = Number(val);
+                    displayVal = isNaN(numericVal) ? val : numericVal.toLocaleString();
                   }
                   
                   return (
-                    <td key={col.id} className={`py-1 text-[12px] text-gray-700 ${isAmount || isNumber ? "text-right" : ""}`}>
+                    <td key={col.id} className={`py-1 text-[12px] text-gray-700 ${isMainAmount || isNumber ? "text-right" : ""}`}>
                       {displayVal}
                     </td>
                   );
@@ -202,10 +248,11 @@ export function DocumentLayout({
               return acc + val;
             }, 0);
             
+            const isMainAmount = mainAmtCol && totalCol.id === mainAmtCol.id;
             return (
               <div key={totalCol.id} className="flex justify-between text-[12px] text-gray-600 border-b border-gray-100 pb-0.5">
                 <span className="font-medium">{totalCol.label}</span>
-                <span>{currency} {sum.toLocaleString()}</span>
+                <span>{isMainAmount ? `${currency} ` : ""}{sum.toLocaleString()}</span>
               </div>
             );
           })}
